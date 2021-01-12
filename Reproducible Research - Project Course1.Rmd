@@ -1,0 +1,130 @@
+# Reproducible Research - Project Course 1
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+For this assignment, the data will be available at my Github repository, but  
+you can also download it from  [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip). 
+  
+I started reading the CSV file and saving into variable **OrigData**.  
+After that, I subset the data removing the NAs, saving the output into variable
+**actData** (keeping the original data for posterior use if necessary).  
+
+
+```{r ReadingData}
+OrigData <- read.csv("activity.csv")
+head(OrigData)
+actData <- subset(OrigData, !is.na(OrigData$steps))
+head(actData)
+summary(actData)
+```
+
+### Histogram
+
+ Let's create a histogram for the total number of steps taken each day:  
+
+```{r histogram}
+TotalStepsD <- aggregate(steps~date, OrigData, sum)
+
+hist(TotalStepsD$steps, 
+     breaks = 30,
+     xlab = "Total of Steps (Daily)",
+     main = "Histogram for total number of steps taken each day(OrigData)")
+```
+
+### Averages
+
+ Now lets take a look on the mean and median number of steps taken each day:
+
+```{r}
+avgD <- aggregate(steps~date, actData, mean)
+head(avgD)
+avg <- (aggregate(steps~interval, actData, mean))
+paste("The mean interval is located at the ", 
+      avg[avg$steps == max(avg$steps),1],
+      "interval, with ",avg[avg$steps == max(avg$steps),2]," mean steps.")
+med <- aggregate(steps~interval, actData, median)
+paste("The median interval is located at the ", 
+      med[med$steps == max(med$steps),1],
+      "interval, with ",med[med$steps == max(med$steps),2]," median steps.")
+
+```
+
+### Plotting the average
+
+ Plotting the average of steps:  
+
+```{r}
+plot(avg, type = "l", col = "blue")
+points(avg[avg$steps == max(avg$steps),1],avg[avg$steps == max(avg$steps),2], 
+       pch = 20, 
+       col = "red")
+text(avg[avg$steps == max(avg$steps),1]+200,avg[avg$steps == max(avg$steps),2],
+     paste("(",as.character(trunc(avg[avg$steps == max(avg$steps),1])),",",
+           as.character(trunc(avg[avg$steps == max(avg$steps),2])),")"))
+
+```
+ 
+### Missing Values
+
+> Then total of missing values is **`r sum(is.na(OrigData$steps))`**.
+
+The approach to impute the missing values will be to create a new data set called OrigData_imputed updating the missing values by the interval mean.
+
+```{r}
+imp_steps <- avg$steps[match(OrigData$interval, avg$interval)]
+
+OrigData_imputed <- transform(OrigData, steps = ifelse(is.na(OrigData$steps), 
+                                                       yes = imp_steps, no = OrigData$steps))
+total_imp_steps <- aggregate(steps ~ date, OrigData_imputed, sum)
+```
+
+### The new histogram with imputed missing values
+
+```{r}
+hist(total_imp_steps$steps, 
+     breaks = 30,
+     xlab = "Total of Steps (Daily)",
+     main = "Total number of steps taken each day (NAs updated as interval means)")
+
+```
+
+### Comparison of average number of steps taken per interval across weekdays and weekends.  
+
+Lets start adjusting changing the data type for the date.
+
+```{r}
+OrigData$date <- as.Date(as.character(OrigData$date, "%Y%m%d"))
+
+```
+
+Now, lets create a new factor with two levels - "Weekday" and "weekend".
+
+```{r}
+OrigData$datetype <- sapply(OrigData$date, function(x) {
+    if (weekdays(x) == "sábado" | weekdays(x) =="domingo") 
+    {y <- "Weekend"} else 
+    {y <- "Weekday"}
+    y
+})
+
+```
+
+Then, lets generate a times series plot in a panel plot (we are going to use ggplot2 for this):
+
+```{r, warning=FALSE}
+library(ggplot2)
+OrigData_by_date <- aggregate(steps~interval + datetype, OrigData, mean, na.rm = TRUE)
+
+ggplot(OrigData_by_date, aes(interval, steps, color=datetype))+
+    geom_line()+
+    labs(title = "Average daily steps by type of date", x = "Interval", 
+         y = "Average number of steps") +
+       facet_wrap(~datetype, ncol = 1, nrow=2)
+
+```
+
+
+
